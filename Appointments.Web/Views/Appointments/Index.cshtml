@@ -1,0 +1,133 @@
+﻿@using Kendo.Mvc.UI
+@using Appointments.Web.Models;
+@{
+    ViewBag.Title = "Index";
+}
+
+
+@(Html.Kendo().Scheduler<EventViewModel>()
+            .Name("scheduler")
+            .Date(DateTime.Now)
+            .Height(600)
+            .Views(views =>
+            {
+                views.DayView(dayView => dayView.Selected(true));
+                views.WeekView();
+                views.MonthView();
+                views.AgendaView();
+            })
+            .AllDaySlot(false)
+            .CurrentTimeMarker(true)
+            .MinorTickCount(2)
+        //.MajorTick(30)
+            .Timezone("Etc/UTC")
+                    .Resources(resource =>
+                    {
+                        resource.Add(a => a.TypeId)
+                            .DataValueField("Id")
+                            .DataTextField("Name")
+                            .DataColorField("Color")
+                            .DataSource(f => f.Read(r => r.Action("GetTypes", "Appointments")));
+                    })
+            .DataSource(d => d
+                .Model(m =>
+                {
+                    m.Id(f => f.AppointmentId);
+                })
+                .Read(r => r.Action("Appointments_Read", "Appointments").Data("schedulerAdditionalData"))
+                .ServerOperation(true)
+                )
+            .Events(ev =>
+            {
+                ev.Add("onAddEvent");
+                ev.Edit("onEditEvent");
+            })
+            
+
+)
+
+@(Html.Kendo().ContextMenu()
+.Name("menu")
+.Target("#scheduler")
+.Filter(".k-event")
+.Items(i => {
+    i.Add().Text("Delete");
+    i.Add().Text("Scheduled");
+    i.Add().Text("Arrived");
+    i.Add().Text("Canceled");
+    i.Add().Text("Completed");    
+            })
+            .Events(e => e.Select("onMenuItemSelect"))
+            )
+
+
+@section scripts{
+    <script>
+
+    function schedulerAdditionalData() {
+        var scheduler = $("#scheduler").data("kendoScheduler");
+
+        var result = {
+            start: scheduler.view().startDate().toISOString(),
+            end: scheduler.view().endDate().toISOString()
+        }
+
+        return result;
+    }
+
+    function onAddEvent(e) {
+        e.preventDefault();
+        var start = kendo.format("{0:s}", e.event.start);
+        var end = kendo.format("{0:s}", e.event.end)
+        var url = "@Url.Action("Appointment", "Appointments")" + "?start=" + start + "&end=" + end;
+        window.location = url;
+    }
+
+    function onEditEvent(e) {
+        e.preventDefault();
+        var url = "@Url.Action("Appointment", "Appointments")" + "/" + e.event.AppointmentId;
+            window.location = url;
+        }
+
+        function httpGet(theUrl) {
+            var xmlHttp = new XMLHttpRequest();
+            xmlHttp.open("GET", theUrl, false);
+            xmlHttp.send(null);
+            return xmlHttp.responseText;
+        }
+
+        function onMenuItemSelect(e) {
+            var scheduler = $("#scheduler").data("kendoScheduler");
+
+            var event = $(e.target);
+            var uid = event.data("uid")
+            var dataSource = scheduler.dataSource;
+            var item = dataSource.getByUid(uid);
+            var appointmentId = item.AppointmentId;
+            var url = "";
+            
+            switch ($(e.item).children(".k-link").text()) {
+                case "Delete":
+                    url = '@Url.Action("Delete", "Appointments", new { id = "" })' + "/" + appointmentId;
+                    break;
+                case "Scheduled":
+                    url = '@Url.Action("ChangeStatus", "Appointments", new { id = "" })' + "/" + appointmentId + "?status=Scheduled";                    
+                    break;
+                case "Arrived":
+                    url = '@Url.Action("ChangeStatus", "Appointments", new { id = "" })' + "/" + appointmentId + "?status=Arrived";
+                    break;
+                case "Canceled":
+                    url = '@Url.Action("ChangeStatus", "Appointments", new { id = "" })' + "/" + appointmentId + "?status=Cancelled";
+                    break;
+                case "Completed":
+                    url = '@Url.Action("ChangeStatus", "Appointments", new { id = "" })' + "/" + appointmentId + "?status=Completed";
+                    break;
+            }
+            
+            var result = httpGet(url);
+            if (result == "true") {
+                window.location.href = '@Url.Action("Index", "Appointments")';
+            }
+        }
+    </script>
+}
